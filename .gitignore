@@ -1,0 +1,15 @@
+# Python environment
+venv/
+__pycache__/
+*.pyc
+
+# Data 
+data/raw/*.csv
+data/processed/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# System
+.DS_Store
+.env
