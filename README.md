@@ -2,15 +2,15 @@
 
 Comparing machine learning against the chain-ladder method for insurance loss reserving — a core actuarial problem that has relied on the same deterministic approach for decades.
 
-**Result:** XGBoost reduced reserve estimation error by 49.4% vs chain-ladder ($197,402 vs $390,109 RMSE) on held-out accident years 2003–2007.
+**Result:** XGBoost reduced reserve estimation error by 48.9% vs chain-ladder ($198,304 vs $387,770 RMSE) on held-out accident years 2003–2007, evaluated on a paid loss basis.
 
 ---
 
 ## The problem
 
-Property & casualty insurers must estimate their ultimate claim liabilities — losses that have been incurred but not yet fully paid. The industry standard is the chain-ladder method: compute historical age-to-age development factors and project each accident year's losses to ultimate by chaining those factors forward.
+Property & casualty insurers must estimate their ultimate claim liabilities — losses that have been incurred but not yet fully paid. The industry standard is the **chain-ladder method**: compute historical age-to-age (ATA) development factors and project each accident year's losses to ultimate by chaining those factors forward.
 
-Chain-ladder is transparent and auditable, but it has known weaknesses. It relies on average factors that get skewed by outlier years, assumes development patterns are stable across lines of business, and cannot incorporate signals like paid-to-incurred ratios or reserve maturity that an experienced actuary would use qualitatively.
+Chain-ladder is transparent and auditable, but it has known weaknesses. It relies on median factors that can be skewed by outlier years, assumes development patterns are stable over time, and cannot incorporate signals like paid-to-incurred ratios or reserve maturity that an experienced actuary would use qualitatively.
 
 This project asks: can a gradient boosted tree model learn those signals and produce more accurate reserve estimates?
 
@@ -27,25 +27,27 @@ Six lines of business: private passenger auto, commercial auto, workers compensa
 - Train: accident years 1998–2002 (33,567 rows)
 - Test: accident years 2003–2007 (30,719 rows) — never seen during training
 
+**Why paid basis:** The CAS database records net incurred losses inclusive of reserve releases, causing incurred losses to decrease from lag 1 to lag 10 in ~70% of cases. Paid losses develop upward in ~74% of cases and show large development factors (e.g. medmal: 68× from lag 1 to ultimate). Both the ML model and chain-ladder baseline are therefore evaluated on a paid loss basis for a consistent, meaningful comparison.
+
 ---
 
 ## Methodology
 
 ### Chain-ladder baseline
 
-For each development lag, the median age-to-age (ATA) factor is computed across all companies in the training set. To predict ultimate losses for a snapshot at lag *k*, those factors are chained from lag *k* through lag 9:
+For each development lag, the median ATA factor is computed across all companies in the training set on a paid loss basis. To predict ultimate paid losses for a snapshot at lag *k*, those factors are chained from lag *k* through lag 9:
 
 ```
-ultimate = incurred_loss × ATA(k) × ATA(k+1) × ... × ATA(9)
+ultimate_paid = paid_loss × ATA(k) × ATA(k+1) × ... × ATA(9)
 ```
 
 Median factors are used rather than volume-weighted averages to be robust against outlier companies. Factors are pooled across lines of business — the simplest valid implementation and the correct baseline to benchmark against.
 
-A key empirical finding: all ATA factors in this dataset are ≤ 1.0. This reflects that the CAS data uses *net incurred losses*, which include reserve releases. When reserves are released, incurred losses decrease — producing sub-1.0 factors. This is a real-world actuarial nuance that a naive positive-development assumption would miss.
+**A dataset limitation worth noting:** the CAS data covers only 10 years of development (1998–2007). For companies in the training set (1998–2002), paid losses between consecutive lags are largely stable by the time the data was recorded — producing ATA factors near 1.0 for most lags. This limits the chain-ladder's predictive power on this particular dataset. In a real reserving context, the baseline would be fit on a richer historical triangle. The comparison remains valid: both models see identical training data and are evaluated on the same held-out test set.
 
 ### Feature engineering
 
-Each row represents a claim snapshot at a given development lag (1–9). The target is the ultimate incurred loss at lag 10 for that company / accident year / line combination.
+Each row represents a claim snapshot at a given development lag (1–9). The target is the ultimate paid loss at lag 10 for that company / accident year / line combination.
 
 | Feature | Description |
 |---|---|
@@ -53,9 +55,10 @@ Each row represents a claim snapshot at a given development lag (1–9). The tar
 | `maturity_pct` | `dev_lag / 9.0` — normalized maturity signal |
 | `incurred_loss` | Cumulative incurred loss at snapshot date |
 | `paid_loss` | Cumulative paid loss at snapshot date |
-| `case_reserve` | `incurred - paid`, clipped to 0 (reserve releases) |
-| `paid_ratio` | `paid / incurred`, clipped to 2.0 (data artifacts) |
-| `log_incurred` | Log-transformed incurred — stabilizes heavy tail |
+| `case_reserve` | `incurred - paid`, clipped to 0 |
+| `paid_ratio` | `paid / incurred`, clipped to 2.0 |
+| `log_paid` | Log-transformed paid loss — stabilizes heavy tail |
+| `log_incurred` | Log-transformed incurred loss |
 | `line_*` | One-hot encoded line of business (6 dummies) |
 
 The target (`log_target = log1p(target_ultimate)`) is log-transformed during training to prevent large losses from dominating the loss function. Predictions are exponentiated back to dollars for evaluation.
@@ -72,7 +75,7 @@ XGBRegressor(
 )
 ```
 
-Depth-4 trees prevent memorizing company-specific noise. Validation loss stabilized around round 150–200 with no overfitting through round 300.
+Depth-4 trees prevent memorizing company-specific noise. Validation loss stabilized around round 150–200 with no meaningful overfitting through round 300.
 
 ---
 
@@ -82,23 +85,27 @@ Depth-4 trees prevent memorizing company-specific noise. Validation loss stabili
 
 | Model | RMSE | vs baseline |
 |---|---|---|
-| Chain-ladder | $390,109 | — |
-| XGBoost | $197,402 | −49.4% |
+| Chain-ladder | $387,770 | — |
+| XGBoost | $198,304 | −48.9% |
 
 ### By line of business
 
 | Line | Chain-ladder RMSE | XGBoost RMSE | Improvement |
 |---|---|---|---|
-| comauto | $27,773 | $3,543 | −87.2% |
-| medmal | $41,515 | $18,110 | −56.4% |
-| othliab | $23,298 | $31,275 | +34.2% ⚠ |
-| ppauto | $910,451 | $459,491 | −49.5% |
-| prodliab | $10,000 | $2,198 | −78.0% |
-| wkcomp | $48,113 | $22,837 | −52.6% |
+| comauto | $28,079 | $4,219 | −85.0% |
+| medmal | $42,214 | $15,993 | −62.1% |
+| othliab | $23,772 | $33,648 | +41.5% ⚠ |
+| ppauto | $905,262 | $461,364 | −49.0% |
+| prodliab | $8,432 | $2,200 | −73.9% |
+| wkcomp | $40,740 | $22,361 | −45.1% |
 
-**Notable finding:** `othliab` (other liability) is the one line where chain-ladder outperforms XGBoost. Other liability has the most heterogeneous claim mix of any line — general liability, environmental, professional, and more — which may require line-specific feature engineering or a longer training window to model reliably. This is an honest limitation and a direction for future work.
+**Notable finding:** `othliab` (other liability) is the one line where chain-ladder outperforms XGBoost. Other liability has the most heterogeneous claim mix — spanning general, environmental, and professional liability — which may require line-specific feature engineering or a longer training window. This is an honest limitation and a direction for future work.
 
-`ppauto`'s high absolute RMSE reflects its large exposure base and individual claim sizes; the 49.5% percentage improvement is consistent with the other lines.
+`ppauto`'s high absolute RMSE reflects its large exposure base and individual claim sizes; the 49.0% percentage improvement is consistent with the other lines.
+
+### Feature importance
+
+`incurred_loss` and `log_incurred` are the dominant signals (combined ~70% of importance), followed by `paid_loss` and `log_paid`. Actuarial ratio features (`paid_ratio`, `case_reserve`, `maturity_pct`) contribute less than raw loss amounts, suggesting the model primarily learns from loss magnitude and scale rather than maturity signals — a direction for future feature engineering.
 
 ---
 
@@ -148,6 +155,6 @@ jupyter notebook     # open notebooks/
 ## Skills demonstrated
 
 - **Data engineering:** multi-file ingestion pipeline, schema normalization, reproducible cleaning
-- **Actuarial domain knowledge:** chain-ladder implementation, ATA factor analysis, reserve triangle interpretation
+- **Actuarial domain knowledge:** chain-ladder implementation, ATA factor analysis, reserve triangle interpretation, paid vs incurred basis selection
 - **Machine learning:** gradient boosting, log-target transformation, chronological train/test split, overfitting diagnostics
-- **Software engineering:** modular src layout, unit tests with pytest, typed function signatures, git history
+- **Software engineering:** modular src layout, unit tests with pytest, typed function signatures, documented limitations
