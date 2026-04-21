@@ -4,52 +4,49 @@ import numpy as np
 
 class ActuarialBaseline:
     """
-    Chain-ladder reserve estimator using median age-to-age (ATA) factors.
+    Chain-ladder reserve estimator using median age-to-age (ATA) factors
+    computed on cumulative paid losses.
 
-    Factors are pooled across all lines of business — the simplest valid
-    chain-ladder implementation. This is intentional: the ML model gets
-    explicit line-of-business features and can learn line-specific patterns,
-    while the baseline uses pooled factors. That asymmetry makes the
-    comparison more meaningful, not less.
+    Paid losses are used because the CAS database records net incurred losses
+    inclusive of reserve releases, causing incurred to decrease over time in
+    ~70% of cases. Paid losses develop upward in ~74% of cases and are the
+    correct basis for a chain-ladder projection in this dataset.
+
+    Factors are pooled across all lines. The ML model receives line dummies
+    and learns line-specific patterns; the baseline uses pooled factors.
     """
 
     def __init__(self):
-        self.factors_ = None       # DataFrame: dev_lag, ata
-        self._factor_lookup = {}   # dict: {lag: factor} for fast predict
+        self.factors_ = None      # DataFrame: dev_lag, ata
+        self._factor_lookup = {}  # dict: {lag: factor}
 
     def fit(self, train_df: pd.DataFrame) -> "ActuarialBaseline":
         """
-        Compute median ATA factors from training data.
+        Compute median ATA factors from paid losses in training data.
 
         Parameters
         ----------
         train_df : DataFrame
-            Cleaned, feature-engineered training rows (lags 1-9).
-            Must contain: company, accident_year, dev_lag, incurred_loss.
+            Feature-engineered training rows (lags 1-9).
+            Must contain: company, accident_year, dev_lag, paid_loss.
         """
         temp = train_df.sort_values(["company", "accident_year", "dev_lag"]).copy()
 
-        # ATA(lag) = incurred_loss(lag+1) / incurred_loss(lag)
-        # Group by company + accident_year only — no 'line' column after get_dummies
-        temp["next_loss"] = (
-            temp.groupby(["company", "accident_year"])["incurred_loss"]
+        temp["next_paid"] = (
+            temp.groupby(["company", "accident_year"])["paid_loss"]
             .shift(-1)
         )
 
-        # Drop lag 9 rows (no lag 10 in training since dev_lag < 10 filter)
-        temp = temp.dropna(subset=["next_loss"])
-        temp = temp[temp["incurred_loss"] > 0]
+        temp = temp.dropna(subset=["next_paid"])
+        temp = temp[temp["paid_loss"] > 0]
+        temp["ata"] = temp["next_paid"] / temp["paid_loss"]
 
-        temp["ata"] = temp["next_loss"] / temp["incurred_loss"]
-
-        # Pool factors across all lines — median is robust to outlier companies
         self.factors_ = (
             temp.groupby("dev_lag")["ata"]
             .median()
             .reset_index()
         )
 
-        # Build fast lookup: {lag: factor}
         self._factor_lookup = dict(
             zip(self.factors_["dev_lag"], self.factors_["ata"])
         )
@@ -58,36 +55,33 @@ class ActuarialBaseline:
 
     def predict(self, df: pd.DataFrame) -> pd.Series:
         """
-        Project each snapshot to ultimate by chaining ATA factors.
+        Project each paid loss snapshot to ultimate by chaining ATA factors.
 
-        For a row at dev_lag k, multiplies incurred_loss by:
+        For a row at dev_lag k, multiplies paid_loss by:
             ATA(k) * ATA(k+1) * ... * ATA(9)
 
         Parameters
         ----------
         df : DataFrame
-            Rows to predict. Must contain: dev_lag, incurred_loss.
+            Must contain: dev_lag, paid_loss.
 
         Returns
         -------
-        pd.Series of predicted ultimate losses, aligned to df.index.
+        pd.Series of predicted ultimate paid losses, aligned to df.index.
         """
         if self.factors_ is None:
             raise RuntimeError("Call fit() before predict().")
 
         def _chain(row):
-            loss = row["incurred_loss"]
+            loss = row["paid_loss"]
             for lag in range(int(row["dev_lag"]), 10):
                 loss *= self._factor_lookup.get(lag, 1.0)
             return loss
 
         return df.apply(_chain, axis=1).rename("baseline_pred")
 
-    def get_factors_table(self) -> pd.DataFrame:
-        """
-        Return fitted ATA factors as a tidy Series indexed by dev_lag.
-        Useful for README methodology section.
-        """
+    def get_factors_table(self) -> pd.Series:
+        """Return fitted ATA factors as a Series indexed by dev_lag."""
         if self.factors_ is None:
             raise RuntimeError("Call fit() before get_factors_table().")
         return self.factors_.set_index("dev_lag")["ata"].round(4)
