@@ -10,7 +10,7 @@ RENAME_MAP = {
 }
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:
-    # Rename columns based on what's actually in your CSVs
+    # Rename columns
     df = df.rename(columns={k: v for k, v in RENAME_MAP.items() if k in df.columns})
     
     # Drop rows missing vital info
