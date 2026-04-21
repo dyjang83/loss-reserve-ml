@@ -18,7 +18,7 @@ This project asks: can a gradient boosted tree model learn those signals and pro
 
 ## Data
 
-**Source:** [CAS Loss Reserve Database](https://www.casact.org/research/reserve-data) — publicly available from the Casualty Actuarial Society.
+**Source:** [CAS Loss Reserve Database](https://www.casact.org/publications-research/research/research-resources/loss-reserving-data-pulled-naic-schedule-p) — publicly available from the Casualty Actuarial Society.
 
 Six lines of business: private passenger auto, commercial auto, workers compensation, medical malpractice, other liability, and product liability. Each contains schedule P triangle data for accident years 1998–2007 across hundreds of US insurers.
 
