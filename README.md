@@ -8,7 +8,7 @@ Comparing machine learning against the chain-ladder method for insurance loss re
 
 ## The problem
 
-Property & casualty insurers must estimate their ultimate claim liabilities — losses that have been incurred but not yet fully paid. The industry standard is the **chain-ladder method**: compute historical age-to-age development factors and project each accident year's losses to ultimate by chaining those factors forward.
+Property & casualty insurers must estimate their ultimate claim liabilities — losses that have been incurred but not yet fully paid. The industry standard is the chain-ladder method: compute historical age-to-age development factors and project each accident year's losses to ultimate by chaining those factors forward.
 
 Chain-ladder is transparent and auditable, but it has known weaknesses. It relies on average factors that get skewed by outlier years, assumes development patterns are stable across lines of business, and cannot incorporate signals like paid-to-incurred ratios or reserve maturity that an experienced actuary would use qualitatively.
 
@@ -136,7 +136,7 @@ python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Download the six CAS schedule P CSVs from [casact.org/research/reserve-data](https://www.casact.org/research/reserve-data) and place them in `data/raw/`.
+Download the six CAS schedule P CSVs from [casact.org/research/reserve-data](https://www.casact.org/publications-research/research/research-resources/loss-reserving-data-pulled-naic-schedule-p) and place them in `data/raw/`.
 
 ```bash
 pytest tests/        # run tests
