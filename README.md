@@ -120,12 +120,15 @@ loss-reserve-ml/
 │   ├── 01_eda.ipynb       # Exploratory data analysis
 │   └── 02_training.ipynb  # Model training and benchmarking
 ├── src/
+│   ├── __init__.py
 │   ├── data/
-│   │   ├── loader.py    # Ingestion
-│   │   ├── cleaner.py   # Cleaning and derived columns
-│   │   └── features.py  # Feature engineering + X_COLS definition
+│   │   ├── __init__.py
+│   │   ├── loader.py
+│   │   ├── cleaner.py
+│   │   └── features.py
 │   └── models/
-│       └── baseline.py  # Chain-ladder ActuarialBaseline class
+│       ├── __init__.py
+│       └── baseline.py
 ├── tests/
 │   ├── test_cleaner.py
 │   └── test_baseline.py
@@ -137,7 +140,7 @@ loss-reserve-ml/
 ## Setup
 
 ```bash
-git clone https://github.com/yourusername/loss-reserve-ml.git
+git clone https://github.com/dyjang83/loss-reserve-ml.git
 cd loss-reserve-ml
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
