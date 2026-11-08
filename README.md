@@ -2,13 +2,13 @@
 
 Comparing machine learning against the chain-ladder method for insurance loss reserving — a core actuarial problem that has relied on the same deterministic approach for decades.
 
-**Result:** XGBoost reduced reserve estimation error by 48.9% vs chain-ladder ($198,304 vs $387,770 RMSE) on held-out accident years 2003–2007, evaluated on a paid loss basis.
+Result: XGBoost reduced reserve estimation error by 48.9% vs chain-ladder ($198,304 vs $387,770 RMSE) on held-out accident years 2003–2007, evaluated on a paid loss basis.
 
 ---
 
 ## The problem
 
-Property & casualty insurers must estimate their ultimate claim liabilities — losses that have been incurred but not yet fully paid. The industry standard is the **chain-ladder method**: compute historical age-to-age (ATA) development factors and project each accident year's losses to ultimate by chaining those factors forward.
+Property & casualty insurers must estimate their ultimate claim liabilities — losses that have been incurred but not yet fully paid. One of the industry standards is the chain-ladder method: compute historical age-to-age (ATA) development factors and project each accident year's losses to ultimate by chaining those factors forward.
 
 Chain-ladder is transparent and auditable, but it has known weaknesses. It relies on median factors that can be skewed by outlier years, assumes development patterns are stable over time, and cannot incorporate signals like paid-to-incurred ratios or reserve maturity that an experienced actuary would use qualitatively.
 
@@ -43,7 +43,6 @@ ultimate_paid = paid_loss × ATA(k) × ATA(k+1) × ... × ATA(9)
 
 Median factors are used rather than volume-weighted averages to be robust against outlier companies. Factors are pooled across lines of business — the simplest valid implementation and the correct baseline to benchmark against.
 
-**A dataset limitation worth noting:** the CAS data covers only 10 years of development (1998–2007). For companies in the training set (1998–2002), paid losses between consecutive lags are largely stable by the time the data was recorded — producing ATA factors near 1.0 for most lags. This limits the chain-ladder's predictive power on this particular dataset. In a real reserving context, the baseline would be fit on a richer historical triangle. The comparison remains valid: both models see identical training data and are evaluated on the same held-out test set.
 
 ### Feature engineering
 
@@ -153,11 +152,3 @@ pytest tests/        # run tests
 jupyter notebook     # open notebooks/
 ```
 
----
-
-## Skills demonstrated
-
-- **Data engineering:** multi-file ingestion pipeline, schema normalization, reproducible cleaning
-- **Actuarial domain knowledge:** chain-ladder implementation, ATA factor analysis, reserve triangle interpretation, paid vs incurred basis selection
-- **Machine learning:** gradient boosting, log-target transformation, chronological train/test split, overfitting diagnostics
-- **Software engineering:** modular src layout, unit tests with pytest, typed function signatures, documented limitations
