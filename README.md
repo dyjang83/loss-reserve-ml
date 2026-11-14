@@ -25,7 +25,7 @@ Six lines of business: private passenger auto, commercial auto, workers compensa
 - 70,894 rows after cleaning
 - 768 unique company / accident year combinations
 - Train: accident years 1998–2002 (33,567 rows)
-- Test: accident years 2003–2007 (30,719 rows) — never seen during training
+- Test: accident years 2003–2007 (30,719 rows) 
 
 **Why paid basis:** The CAS database records net incurred losses inclusive of reserve releases, causing incurred losses to decrease from lag 1 to lag 10 in ~70% of cases. Paid losses develop upward in ~74% of cases and show large development factors (e.g. medmal: 68× from lag 1 to ultimate). Both the ML model and chain-ladder baseline are therefore evaluated on a paid loss basis for a consistent, meaningful comparison.
 
